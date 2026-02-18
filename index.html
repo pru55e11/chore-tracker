@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chore Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.4/Sortable.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7ff;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --green: #10b981;
+      --red: #ef4444;
+      --sh: 0 1px 3px rgba(0,0,0,.1);
+      --sh-md: 0 4px 6px -1px rgba(0,0,0,.1);
+      --sh-lg: 0 10px 25px -3px rgba(0,0,0,.15);
+      --r: 12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: #fff; padding: .875rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: var(--sh-md); position: sticky; top: 0; z-index: 10;
+    }
+    .header h1 { font-size: 1.375rem; font-weight: 800; letter-spacing: -.01em; }
+    .header h1 span { opacity: .75; }
+    .hdr-btn {
+      background: rgba(255,255,255,.18); border: none; color: #fff;
+      border-radius: 8px; padding: .45rem .8rem; font-size: .875rem;
+      font-weight: 600; cursor: pointer; transition: background .15s;
+      display: flex; align-items: center; gap: .35rem;
+    }
+    .hdr-btn:hover { background: rgba(255,255,255,.3); }
+
+    /* ── Week nav ── */
+    .week-nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: .625rem 1.25rem; display: flex; align-items: center; gap: .625rem;
+      flex-wrap: wrap;
+    }
+    .week-label { font-weight: 700; font-size: .9375rem; flex: 1; min-width: 160px; }
+    .copy-btn {
+      background: none; border: none; color: var(--primary); font-size: .8125rem;
+      font-weight: 600; cursor: pointer; padding: .3rem .6rem; border-radius: 6px;
+      transition: background .15s; display: none; align-items: center; gap: .3rem;
+    }
+    .copy-btn:hover { background: #e0e7ff; }
+    .copy-btn.visible { display: flex; }
+
+    /* ── Board ── */
+    .board-wrap { flex: 1; overflow-x: auto; padding: 1.25rem 1.25rem 1.5rem; }
+    .board { display: flex; gap: 1rem; min-height: 480px; align-items: flex-start; }
+
+    /* ── Column ── */
+    .col { width: 215px; flex-shrink: 0; display: flex; flex-direction: column; gap: .5rem; }
+    .col-head {
+      background: var(--card); border-radius: var(--r);
+      padding: .875rem 1rem; box-shadow: var(--sh); text-align: center;
+    }
+    .col-avail .col-head {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+    }
+    .col-title {
+      font-weight: 700; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center; gap: .4rem;
+    }
+    .kid-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .col-earned { margin-top: .3rem; font-size: .8125rem; color: var(--muted); }
+    .col-earned strong { color: var(--green); }
+    .col-potential { font-size: .75rem; color: var(--muted); opacity: .8; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      flex: 1; min-height: 140px; border-radius: var(--r);
+      border: 2px dashed var(--border); background: rgba(255,255,255,.6);
+      padding: .5rem; display: flex; flex-direction: column; gap: .4rem;
+      transition: background .15s, border-color .15s;
+    }
+    .drop-zone.drag-over { background: rgba(99,102,241,.07); border-color: var(--primary); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card); border-radius: 9px; padding: .6rem .75rem;
+      box-shadow: var(--sh); cursor: grab;
+      display: flex; align-items: center; gap: .5rem;
+      transition: box-shadow .15s; user-select: none;
+    }
+    .card:hover { box-shadow: var(--sh-md); }
+    .card.sortable-ghost { opacity: .3; }
+    .card.sortable-chosen { cursor: grabbing; }
+    .card.sortable-drag { box-shadow: var(--sh-lg); transform: rotate(1.5deg); }
+    .card.done { opacity: .55; }
+    .card.done .card-name { text-decoration: line-through; color: var(--muted); }
+
+    .card-check {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid var(--border); flex-shrink: 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .card-check:hover { border-color: var(--green); }
+    .card-check.on { background: var(--green); border-color: var(--green); }
+    .card-check svg { display: none; }
+    .card-check.on svg { display: block; }
+
+    .card-info { flex: 1; min-width: 0; }
+    .card-name { font-size: .875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-amt { font-size: .75rem; font-weight: 700; color: var(--primary); }
+
+    .card-ret {
+      opacity: 0; background: none; border: none; cursor: pointer;
+      color: var(--muted); padding: 3px 5px; border-radius: 5px;
+      font-size: .8rem; line-height: 1; transition: all .15s; flex-shrink: 0;
+    }
+    .card:hover .card-ret { opacity: 1; }
+    .card-ret:hover { background: #fee2e2; color: var(--red); }
+
+    .drop-empty {
+      text-align: center; padding: .75rem .5rem;
+      color: var(--muted); font-size: .8125rem; pointer-events: none;
+    }
+
+    /* ── Summary bar ── */
+    .summary {
+      background: var(--card); border-top: 1px solid var(--border);
+      padding: .75rem 1.5rem; display: flex; gap: 2rem;
+      overflow-x: auto; align-items: center; flex-shrink: 0;
+    }
+    .sum-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); white-space: nowrap; }
+    .sum-kids { display: flex; gap: 1.5rem; }
+    .sum-kid { display: flex; flex-direction: column; align-items: center; }
+    .sum-name { font-size: .75rem; color: var(--muted); font-weight: 600; }
+    .sum-amt { font-size: 1.25rem; font-weight: 800; color: var(--green); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .45rem .9rem; border-radius: 8px; border: none;
+      font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--bg); }
+    .btn-danger { background: #fee2e2; color: var(--red); }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-sm { padding: .3rem .65rem; font-size: .8rem; }
+
+    /* ── Modal ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50; padding: 1rem; opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--card); border-radius: 18px; width: 100%; max-width: 520px;
+      max-height: 88vh; display: flex; flex-direction: column;
+      box-shadow: var(--sh-lg); transform: translateY(14px) scale(.97); transition: transform .2s; overflow: hidden;
+    }
+    .overlay.open .modal { transform: none; }
+    .modal-head {
+      padding: 1.125rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .modal-head h2 { font-size: 1.0625rem; font-weight: 800; }
+    .modal-x {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 1.25rem; line-height: 1; padding: .25rem .4rem; border-radius: 6px; transition: all .15s;
+    }
+    .modal-x:hover { background: var(--bg); color: var(--text); }
+    .modal-body { padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
+    .tab-btn {
+      padding: .5rem 1rem; font-size: .875rem; font-weight: 600; color: var(--muted);
+      background: none; border: none; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; cursor: pointer; transition: all .15s;
+    }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Form ── */
+    .form-row { display: flex; gap: .5rem; align-items: flex-end; margin-bottom: .75rem; }
+    .field { flex: 1; }
+    .field.field-sm { max-width: 82px; }
+    .field label {
+      display: block; font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+      color: var(--muted); margin-bottom: .3rem;
+    }
+    .field input {
+      width: 100%; padding: .475rem .75rem;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: .875rem; outline: none; transition: border-color .15s; background: var(--bg);
+    }
+    .field input:focus { border-color: var(--primary); background: #fff; }
+
+    /* ── Item list ── */
+    .item-list { display: flex; flex-direction: column; gap: .4rem; margin-top: .75rem; }
+    .item-row {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .5rem .75rem; background: var(--bg); border-radius: 8px;
+    }
+    .item-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .item-name { flex: 1; font-size: .875rem; font-weight: 600; }
+    .item-badge {
+      background: #e0e7ff; color: var(--primary);
+      padding: .125rem .5rem; border-radius: 99px; font-size: .75rem; font-weight: 700;
+    }
+
+    /* ── Color picker ── */
+    .colors { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .3rem; }
+    .swatch {
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+      border: 3px solid transparent; transition: all .15s;
+    }
+    .swatch.sel { border-color: var(--text); transform: scale(1.18); }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+
+    /* ── Onboarding hint ── */
+    .hint {
+      padding: 2.5rem 1.5rem; text-align: center;
+      color: var(--muted); max-width: 340px; margin: 0 auto;
+    }
+    .hint-icon { font-size: 3rem; margin-bottom: .75rem; }
+    .hint h2 { font-size: 1.125rem; font-weight: 700; color: var(--text); margin-bottom: .5rem; }
+    .hint p { font-size: .9rem; line-height: 1.6; }
+
+    @media (max-width: 600px) {
+      .board-wrap { padding: 1rem .75rem; }
+      .col { width: 175px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="header">
+  <h1>🧹 Chore <span>Tracker</span></h1>
+  <button class="hdr-btn" onclick="openModal()">⚙️ Settings</button>
+</header>
+
+<!-- ── Week nav ── -->
+<nav class="week-nav">
+  <button class="btn btn-outline btn-sm" onclick="changeWeek(-1)">← Prev</button>
+  <span class="week-label" id="week-label"></span>
+  <button class="btn btn-outline btn-sm" onclick="changeWeek(1)">Next →</button>
+  <button class="btn btn-outline btn-sm" onclick="goToday()">Today</button>
+  <button class="copy-btn" id="copy-btn" onclick="copyFromLastWeek()">↩ Copy last week's assignments</button>
+</nav>
+
+<!-- ── Board ── -->
+<div class="board-wrap">
+  <div class="board" id="board"></div>
+</div>
+
+<!-- ── Summary bar ── -->
+<footer class="summary" id="summary"></footer>
+
+<!-- ── Settings modal ── -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>⚙️ Settings</h2>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="chores">Chores</button>
+        <button class="tab-btn" data-tab="kids">Kids</button>
+        <button class="tab-btn" data-tab="data">Data</button>
+      </div>
+
+      <!-- Chores tab -->
+      <div class="tab-pane active" id="tab-chores">
+        <div class="form-row">
+          <div class="field">
+            <label>Chore name</label>
+            <input id="chore-name" type="text" placeholder="e.g. Dishes" />
+          </div>
+          <div class="field field-sm">
+            <label>$ Amount</label>
+            <input id="chore-amt" type="number" min="0" step="0.25" placeholder="2.00" />
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addChore()">Add</button>
+        </div>
+        <div class="item-list" id="chore-list"></div>
+      </div>
+
+      <!-- Kids tab -->
+      <div class="tab-pane" id="tab-kids">
+        <div class="form-row">
+          <div class="field">
+            <label>Kid's name</label>
+            <input id="kid-name" type="text" placeholder="e.g. Alex" />
+          </div>
+          <button class="btn btn-primary btn-sm" style="align-self:flex-end" onclick="addKid()">Add</button>
+        </div>
+        <div>
+          <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.4rem">Color</p>
+          <div class="colors" id="color-picker"></div>
+        </div>
+        <div class="item-list" id="kid-list"></div>
+      </div>
+
+      <!-- Data tab -->
+      <div class="tab-pane" id="tab-data">
+        <p style="font-size:.875rem;color:var(--muted);margin-bottom:1rem">All data lives in your browser's local storage. Export a backup or import a previous save.</p>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <button class="btn btn-outline" onclick="exportData()">📥 Export backup (JSON)</button>
+          <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📤 Import backup (JSON)</button>
+          <input id="import-file" type="file" accept=".json" style="display:none" onchange="importData(event)" />
+          <div class="divider"></div>
+          <button class="btn btn-danger" onclick="resetAll()">🗑️ Reset all data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   State
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+const STORE_KEY = 'chore-tracker-v1';
+
+function fresh() { return { chores: [], kids: [], weeks: {} }; }
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || fresh(); }
+  catch { return fresh(); }
+}
+
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+let state = load();
+let currentWeek = weekStart(new Date());
+let pickedColor = '#6366f1';
+const COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#8b5cf6','#14b8a6'];
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Date utilities
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function weekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();                       // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;       // shift to Monday
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return localDateStr(d);
+}
+
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function weekLabel(ws) {
+  const s = new Date(ws + 'T12:00:00');
+  const e = new Date(ws + 'T12:00:00');
+  e.setDate(e.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`;
+}
+
+function shiftWeek(ws, n) {
+  const d = new Date(ws + 'T12:00:00');
+  d.setDate(d.getDate() + n * 7);
+  return localDateStr(d);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Week data
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function ensureWeek(ws) {
+  if (!state.weeks[ws]) state.weeks[ws] = { assignments: [] };
+  syncChores(ws);
+}
+
+function syncChores(ws) {
+  const wk = state.weeks[ws];
+  const ids = new Set(state.chores.map(c => c.id));
+  // Remove assignments for deleted chores
+  wk.assignments = wk.assignments.filter(a => ids.has(a.choreId));
+  // Add assignments for new chores
+  const assigned = new Set(wk.assignments.map(a => a.choreId));
+  for (const c of state.chores) {
+    if (!assigned.has(c.id)) {
+      wk.assignments.push({ id: uid(), choreId: c.id, kidId: null, completed: false });
+    }
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Utilities
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function uid() {
+  return crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function money(n) { return '$' + Number(n).toFixed(2); }
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SortableJS instances
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+let sortables = [];
+function destroySortables() { sortables.forEach(s => s.destroy()); sortables = []; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Render — board
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function render() {
+  destroySortables();
+
+  document.getElementById('week-label').textContent = weekLabel(currentWeek);
+
+  ensureWeek(currentWeek);
+  save();
+
+  const wk = state.weeks[currentWeek];
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  // Copy-from-last-week button visibility
+  const lastWs = shiftWeek(currentWeek, -1);
+  const lastWk = state.weeks[lastWs];
+  const lastHasAssignments = lastWk && lastWk.assignments.some(a => a.kidId !== null);
+  const curHasAssignments = wk.assignments.some(a => a.kidId !== null);
+  const copyBtn = document.getElementById('copy-btn');
+  copyBtn.classList.toggle('visible', !!(lastHasAssignments && !curHasAssignments));
+
+  // Column definitions: available pool + one per kid
+  const cols = [
+    { id: 'available', label: 'Available Chores', color: null, avail: true },
+    ...state.kids.map(k => ({ id: k.id, label: k.name, color: k.color, avail: false }))
+  ];
+
+  if (state.kids.length === 0 || state.chores.length === 0) {
+    board.innerHTML = `
+      <div class="hint">
+        <div class="hint-icon">🧹</div>
+        <h2>Get started!</h2>
+        <p>Open <strong>⚙️ Settings</strong> to add chores with dollar amounts, then add your kids' names. Drag chores to each kid's column each week and check them off as they're done!</p>
+      </div>`;
+    renderSummary(wk);
+    return;
+  }
+
+  for (const col of cols) {
+    const assignments = wk.assignments.filter(a =>
+      col.avail ? a.kidId === null : a.kidId === col.id
+    );
+
+    const earned = assignments
+      .filter(a => a.completed)
+      .reduce((s, a) => s + (state.chores.find(c => c.id === a.choreId)?.amount ?? 0), 0);
+
+    const potential = assignments
+      .reduce((s, a) => s + (state.chores.find(c => c.id === a.choreId)?.amount ?? 0), 0);
+
+    // Build column
+    const colEl = document.createElement('div');
+    colEl.className = 'col' + (col.avail ? ' col-avail' : '');
+
+    // Header
+    const dotHtml = col.color
+      ? `<span class="kid-dot" style="background:${col.color}"></span>`
+      : '';
+    const earnedHtml = col.avail ? '' : `
+      <div class="col-earned">Earned: <strong>${money(earned)}</strong></div>
+      <div class="col-potential">of ${money(potential)} possible</div>`;
+
+    colEl.innerHTML = `
+      <div class="col-head">
+        <div class="col-title">${dotHtml}${esc(col.label)}</div>
+        ${earnedHtml}
+      </div>`;
+
+    // Drop zone
+    const zone = document.createElement('div');
+    zone.className = 'drop-zone';
+    zone.dataset.kid = col.id;
+
+    // Cards
+    for (const a of assignments) {
+      const chore = state.chores.find(c => c.id === a.choreId);
+      if (!chore) continue;
+
+      const card = document.createElement('div');
+      card.className = 'card' + (a.completed ? ' done' : '');
+      card.dataset.id = a.id;
+      card.innerHTML = `
+        <div class="card-check${a.completed ? ' on' : ''}" data-action="check">
+          <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+            <path d="M1 4L4 7.5L10 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="card-info">
+          <div class="card-name">${esc(chore.name)}</div>
+          <div class="card-amt">${money(chore.amount)}</div>
+        </div>
+        ${!col.avail ? `<button class="card-ret" data-action="return" title="Return to pool">↩</button>` : ''}`;
+
+      zone.appendChild(card);
+    }
+
+    if (assignments.length === 0) {
+      zone.innerHTML = `<div class="drop-empty">${col.avail ? 'All chores assigned! 🎉' : 'Drag chores here'}</div>`;
+    }
+
+    colEl.appendChild(zone);
+    board.appendChild(colEl);
+
+    // SortableJS
+    const s = new Sortable(zone, {
+      group: 'chores',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      filter: '.drop-empty',
+      onEnd(evt) {
+        const aId = evt.item.dataset.id;
+        if (!aId) return;
+        const destKid = evt.to.dataset.kid;
+        const newKidId = destKid === 'available' ? null : destKid;
+        const wk = state.weeks[currentWeek];
+        if (wk) {
+          const a = wk.assignments.find(x => x.id === aId);
+          if (a) { a.kidId = newKidId; save(); }
+        }
+        render();
+      }
+    });
+    sortables.push(s);
+  }
+
+  renderSummary(wk);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Render — summary bar
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function renderSummary(wk) {
+  const el = document.getElementById('summary');
+  if (!state.kids.length) { el.innerHTML = ''; return; }
+
+  const items = state.kids.map(k => {
+    const earned = wk.assignments
+      .filter(a => a.kidId === k.id && a.completed)
+      .reduce((s, a) => s + (state.chores.find(c => c.id === a.choreId)?.amount ?? 0), 0);
+    return `<div class="sum-kid">
+      <span class="sum-name" style="color:${k.color}">${esc(k.name)}</span>
+      <span class="sum-amt">${money(earned)}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<span class="sum-label">Week earnings</span><div class="sum-kids">${items}</div>`;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Render — modal lists
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function renderModal() {
+  // Chore list
+  const cl = document.getElementById('chore-list');
+  cl.innerHTML = state.chores.length
+    ? state.chores.map(c => `
+      <div class="item-row">
+        <span class="item-name">${esc(c.name)}</span>
+        <span class="item-badge">${money(c.amount)}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeChore('${c.id}')">✕</button>
+      </div>`).join('')
+    : '<p style="font-size:.875rem;color:var(--muted);padding:.5rem 0">No chores yet — add one above.</p>';
+
+  // Kid list
+  const kl = document.getElementById('kid-list');
+  kl.innerHTML = state.kids.length
+    ? state.kids.map(k => `
+      <div class="item-row">
+        <span class="item-dot" style="background:${k.color}"></span>
+        <span class="item-name">${esc(k.name)}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeKid('${k.id}')">✕ Remove</button>
+      </div>`).join('')
+    : '<p style="font-size:.875rem;color:var(--muted);padding:.5rem 0">No kids yet — add one above.</p>';
+
+  // Color picker
+  const cp = document.getElementById('color-picker');
+  cp.innerHTML = COLORS.map(c => `
+    <div class="swatch${c === pickedColor ? ' sel' : ''}"
+      style="background:${c}" onclick="pickColor('${c}')"></div>`).join('');
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Actions
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function toggleComplete(id) {
+  const wk = state.weeks[currentWeek];
+  if (!wk) return;
+  const a = wk.assignments.find(x => x.id === id);
+  if (a) { a.completed = !a.completed; save(); render(); }
+}
+
+function returnToPool(id) {
+  const wk = state.weeks[currentWeek];
+  if (!wk) return;
+  const a = wk.assignments.find(x => x.id === id);
+  if (a) { a.kidId = null; a.completed = false; save(); render(); }
+}
+
+function changeWeek(delta) { currentWeek = shiftWeek(currentWeek, delta); render(); }
+function goToday() { currentWeek = weekStart(new Date()); render(); }
+
+function copyFromLastWeek() {
+  const lastWs = shiftWeek(currentWeek, -1);
+  const lastWk = state.weeks[lastWs];
+  if (!lastWk) return;
+  ensureWeek(currentWeek);
+  const curWk = state.weeks[currentWeek];
+  const kidIds = new Set(state.kids.map(k => k.id));
+  for (const a of curWk.assignments) {
+    const la = lastWk.assignments.find(x => x.choreId === a.choreId);
+    if (la) {
+      a.kidId = (la.kidId && kidIds.has(la.kidId)) ? la.kidId : null;
+      a.completed = false;
+    }
+  }
+  save(); render();
+}
+
+function addChore() {
+  const nameEl = document.getElementById('chore-name');
+  const amtEl = document.getElementById('chore-amt');
+  const name = nameEl.value.trim();
+  const amount = parseFloat(amtEl.value) || 0;
+  if (!name) { nameEl.focus(); return; }
+  state.chores.push({ id: uid(), name, amount });
+  ensureWeek(currentWeek);
+  save();
+  nameEl.value = ''; amtEl.value = ''; nameEl.focus();
+  renderModal(); render();
+}
+
+function removeChore(id) {
+  state.chores = state.chores.filter(c => c.id !== id);
+  for (const ws of Object.keys(state.weeks))
+    state.weeks[ws].assignments = state.weeks[ws].assignments.filter(a => a.choreId !== id);
+  save(); renderModal(); render();
+}
+
+function addKid() {
+  const nameEl = document.getElementById('kid-name');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.focus(); return; }
+  state.kids.push({ id: uid(), name, color: pickedColor });
+  save();
+  nameEl.value = ''; nameEl.focus();
+  renderModal(); render();
+}
+
+function removeKid(id) {
+  if (!confirm('Remove this kid? Their chore assignments will return to the available pool.')) return;
+  state.kids = state.kids.filter(k => k.id !== id);
+  for (const ws of Object.keys(state.weeks))
+    for (const a of state.weeks[ws].assignments)
+      if (a.kidId === id) { a.kidId = null; a.completed = false; }
+  save(); renderModal(); render();
+}
+
+function pickColor(c) { pickedColor = c; renderModal(); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Modal
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function openModal() { renderModal(); document.getElementById('overlay').classList.add('open'); }
+function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+function overlayClick(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Data management
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `chore-tracker-${currentWeek}.json`;
+  a.click();
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (d.chores && d.kids && d.weeks) {
+        state = d; save(); render(); closeModal();
+        alert('Data imported!');
+      } else { alert('Invalid file format.'); }
+    } catch { alert('Could not read file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function resetAll() {
+  if (!confirm('Delete all data permanently?')) return;
+  state = fresh(); save(); render(); closeModal();
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Event delegation — board
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+document.getElementById('board').addEventListener('click', e => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (!action) return;
+  const card = e.target.closest('.card');
+  if (!card) return;
+  e.stopPropagation();
+  if (action === 'check') toggleComplete(card.dataset.id);
+  if (action === 'return') returnToPool(card.dataset.id);
+});
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Tabs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  });
+});
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Keyboard shortcuts
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+document.getElementById('chore-name').addEventListener('keydown', e => { if (e.key === 'Enter') addChore(); });
+document.getElementById('chore-amt').addEventListener('keydown', e => { if (e.key === 'Enter') addChore(); });
+document.getElementById('kid-name').addEventListener('keydown', e => { if (e.key === 'Enter') addKid(); });
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Init
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+render();
+</script>
+</body>
+</html>
